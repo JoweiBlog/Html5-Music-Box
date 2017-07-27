@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="author" content="Jowei">
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+  <title>Music</title>
+  <link rel="stylesheet" href="style/index.css">
+  <script src="js/requestAnimationFrame.js"></script>
+  <script src="js/source.js"></script>
+</head>
+<body>
+
+<div class="m-box">
+
+  <div class="m-cover">
+    <img id="m_cover">
+  </div>
+
+  <div class="m-lrc-box" id="m_lrc_box">
+    <div class="m-lrc-scroll-box" id="m_isr_box"></div>
+  </div>
+
+  <div class="m-op-box">
+    <a class="m-op-pre" id="prev_btn"><i class="iconfont">&#xe604;</i></a>
+    <div class="m-op-play">
+      <a class="op-btn-i" id="play_btn"><i class="iconfont">&#xe676;</i></a>
+      <a class="op-btn-i miss" id="pause_btn"><i class="iconfont">&#xee07;</i></a>
+    </div>
+    <a class="m-op-next" id="next_btn"><i class="iconfont">&#xe60c;</i></a>
+  </div>
+
+  <div class="m-frequency-box">
+    <canvas id="m_frequency"></canvas>
+  </div>
+
+  <div class="m-time-box">
+    <div class="m-time-line"><em id="m_time_line"></em></div>
+    <div class="m-time-cur" id="m_current_time">00:00</div>
+    <div class="m-time-duration" id="m_duration">00:00</div>
+  </div>
+
+</div>
+
+<script src="js/index.js"></script>
+<script>
+
+  window.onload = function () {
+    var mb = new MBox(),
+        mi = 0;
+    mb.init(MLS.ml[mi]);
+
+    /**
+     * listener;
+     * */
+    document.getElementById('play_btn').addEventListener('click', function() {
+      mb.play();
+    }, false);
+
+    document.getElementById('pause_btn').addEventListener('click', function() {
+      mb.pause();
+    }, false);
+
+    document.getElementById('prev_btn').addEventListener('click', function() {
+      if (mi > 1) {
+        mi--;
+        mb.init(MLS.ml[mi]);
+        mb.play();
+      }
+    }, false);
+
+    document.getElementById('next_btn').addEventListener('click', function() {
+      if (mi < MLS.ml.length - 1) {
+        mi++;
+        mb.init(MLS.ml[mi]);
+        mb.play();
+      }
+    }, false);
+  };
+
+</script>
+</body>
+</html>
