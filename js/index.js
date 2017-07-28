@@ -6,16 +6,22 @@
 !(function (W) {
 
   W.AudioContext = W.AudioContext || W.webkitAudioContext || W.mozAudioContext || W.msAudioContext;
+  W.$getId = (function (id) { return document.getElementById(id); });
 
-  var $frequency = document.getElementById('m_frequency'),
-    $coverImg = document.getElementById('m_cover'),
-    $lrcBox = document.getElementById('m_lrc_box'),
-    $lrcScrollBox = document.getElementById('m_isr_box'),
-    $currentTime = document.getElementById('m_current_time'),
-    $duration = document.getElementById('m_duration'),
-    $timeline = document.getElementById('m_time_line'),
-    $playBtn = document.getElementById('play_btn'),
-    $pauseBtn = document.getElementById('pause_btn'),
+  var isMobile = function () {
+    var ua = W.navigator.userAgent.toLowerCase();
+    return /(android)|(iphone)|(ipad)|(ipod)/i.test(ua);
+  };
+
+  var $frequency = $getId('m_frequency'),
+    $coverImg = $getId('m_cover'),
+    $lrcBox = $getId('m_lrc_box'),
+    $lrcScrollBox = $getId('m_isr_box'),
+    $currentTime = $getId('m_current_time'),
+    $duration = $getId('m_duration'),
+    $timeline = $getId('m_time_line'),
+    $playBtn = $getId('play_btn'),
+    $pauseBtn = $getId('pause_btn'),
 
     dpr = window.devicePixelRatio || 1;
     $frequency.width = $frequencyWidth = $frequency.clientWidth * dpr,
@@ -36,14 +42,14 @@
 
   MBox = function () {
     _.audioCtx = new AudioContext();
-    _.audio = new Audio();
+    _.audio = !isMobile() ? new Audio() : null;
     _.aniFrame = null;
     _.analyser = _.audioCtx.createAnalyser();
-    _.processor = _.audioCtx.createScriptProcessor(1024);
-    _.processor.connect(_.audioCtx.destination);
-    _.analyser.connect(_.processor);
+    _.buffer = null;
     _.frequencyData = new Uint8Array(_.analyser.frequencyBinCount);
     _.sound = null;
+    _.done = [];  // 已完成加载的音乐项；
+    _.loading = false;
     _.lrc = {
       arr: [],
       cur: 0,
@@ -51,6 +57,8 @@
       centerPos: 0,
     };
     _.timeLine = {
+      startedAt: 0,
+      pausedAt: 0,
       duration: 0,
       currentTime: 0,
     };
@@ -58,6 +66,7 @@
       src: '',
       name: '',
       singer: '',
+      size: '',
       cover: '',
       lyrics: ''
     };
@@ -66,19 +75,21 @@
     /**
      * AddListener
      * */
-    _.audio.addEventListener('canplay', function() {
-      if (!_.sound) {
-        _.sound = _.audioCtx.createMediaElementSource(_.audio);
-        _.sound.connect(_.analyser);
-        _.analyser.connect(_.audioCtx.destination);
-      }
-      _.timeLine.duration = this.duration * 1;
-      $duration.innerText = _.formatDuration(_.timeLine.duration);
-    }, false);
+    if (!isMobile()) {
+      _.audio.addEventListener('canplay', function() {
+        if (!_.sound) {
+          _.sound = _.audioCtx.createMediaElementSource(_.audio);
+          _.sound.connect(_.analyser);
+          _.analyser.connect(_.audioCtx.destination);
+        }
+        _.timeLine.duration = this.duration * 1;
+        $duration.innerText = _.formatDuration(_.timeLine.duration);
+      }, false);
 
-    _.audio.addEventListener('error', function () {
-      throw new Error('load failed');
-    });
+      _.audio.addEventListener('error', function () {
+        throw new Error('load failed');
+      });
+    }
 
     _.setTransform = function (ele, n) {
       ele.style.transition = 'all .4s linear';
@@ -90,6 +101,29 @@
     _.toggleBtnClass = function (s) {
       $playBtn.className = s === 1 ? 'op-btn-i miss' : 'op-btn-i';
       $pauseBtn.className = s === 1 ? 'op-btn-i' : 'op-btn-i  miss';
+    };
+
+    _.loadSource = function (url, cb) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', url, true);
+      xhr.responseType = 'arraybuffer';
+      xhr.onload = function(){
+        _.audioCtx.decodeAudioData(xhr.response, function (buffer) {
+          _.buffer = buffer;
+          cb && cb();
+        });
+      };
+      xhr.send();
+    };
+
+    _.getCurrentTime = function() {
+      if(_.timeLine.pausedAt) {
+        return _.timeLine.pausedAt;
+      }
+      if(_.timeLine.startedAt) {
+        return _.audioCtx.currentTime - _.timeLine.startedAt;
+      }
+      return 0;
     };
 
 
@@ -117,7 +151,7 @@
     };
 
     _.renderLrc = function () {
-      var ct = parseInt(_.audio.currentTime * 100, 10);
+      var ct = parseInt(_.timeLine.currentTime * 100, 10);
       if (_.lrc.cur !== _.lrc.arr.length && ct >= _.lrc.arr[_.lrc.cur].point) {
         _.setTransform($lrcScrollBox, _.lrc.centerPos - _.lrc.step * _.lrc.cur);
         if (_.lrc.cur !== 0) $lrcScrollBox.childNodes[_.lrc.cur - 1].className = '';
@@ -143,6 +177,8 @@
       step = 0,
       meterNum = Math.floor($frequencyWidth / (meterWidth + gap));
     _.renderFrequency = function () {
+      _.frequencyData = new Uint8Array(_.analyser.frequencyBinCount);
+      _.analyser.getByteFrequencyData(_.frequencyData);
       step = Math.round(_.frequencyData.length / meterNum);
       $freCtx.clearRect(0, 0, $frequencyWidth, $frequencyHeight);
       for (var i = 0; i < meterNum; i++) {
@@ -169,14 +205,17 @@
     };
 
     _.renderProcess = function () {
-      _.timeLine.currentTime = _.audio.currentTime;
+      _.timeLine.currentTime = _.audio.currentTime || _.getCurrentTime();
       $currentTime.innerText = _.formatDuration(_.timeLine.currentTime);
       $timeline.style.width = (_.timeLine.currentTime / _.timeLine.duration) * 100 + '%';
     };
 
     _.resetProcess = function () {
       _.timeLine.currentTime = 0;
+      _.timeLine.pausedAt = 0;
+      _.timeLine.startedAt = 0;
       $currentTime.innerText = _.formatDuration(0);
+      $timeline.style.width = '0';
     };
 
 
@@ -197,27 +236,49 @@
         _.aniFrame = requestAnimationFrame(ani);
       });
     };
+
+    _.resetAnimationFrame = function () {
+      _.aniFrame && cancelAnimationFrame(_.aniFrame);
+      _.aniFrame = null;
+      _.resetProcess();
+      _.resetFrequency();
+      _.resetLrc();
+    };
   };
 
   /**
    * play
    * */
   MBox.prototype.play = function () {
+    if (!isMobile()) {
+      _.audio.play();
+    } else {
+      if (_.done.indexOf(_.conf.name) === -1) {
+        return alert('您没有加载音乐哦~，稍等一下，或重新载入页面试试~');
+      }
+
+      if (_.loading) {
+        return alert('音乐正在加载');
+      }
+
+      _.audio = _.audioCtx.createBufferSource();
+      _.audio.buffer = _.buffer;
+      _.audio.connect(_.analyser);
+      _.analyser.connect(_.audioCtx.destination);
+      _.timeLine.duration = _.audio.buffer.duration;
+      $duration.innerText = _.formatDuration(_.timeLine.duration);
+      _.audio.start(0, _.timeLine.pausedAt);
+      _.timeLine.startedAt = _.audioCtx.currentTime + .2 - _.timeLine.pausedAt;
+      _.timeLine.pausedAt = 0;
+    }
+
     _.audio.onended = function () {
-      // _.sound.disconnect();
-      // _.sound = null;
-      _.processor.onaudioprocess = function () {};
       _.resetFrequency();
       _.resetLrc();
       _.resetProcess();
       _.toggleBtnClass(0);
     };
 
-    _.processor.onaudioprocess = function () {
-      _.frequencyData = new Uint8Array(_.frequencyData);
-      _.analyser.getByteFrequencyData(_.frequencyData);
-    };
-    _.audio.play();
     _.setAnimationFrame();
     _.toggleBtnClass(1);
   };
@@ -227,7 +288,15 @@
    * pause
    * */
   MBox.prototype.pause = function () {
-    _.audio && _.audio.pause();
+    if (_.audio) {
+      if (!isMobile()) {
+        _.audio.pause();
+      } else {
+        _.timeLine.pausedAt = _.audioCtx.currentTime - _.timeLine.startedAt;
+        _.audio.disconnect();
+        _.audio.stop();
+      }
+    }
     _.toggleBtnClass(0);
   };
 
@@ -239,7 +308,7 @@
    * */
   MBox.prototype.init = function (m) {
     if (!m) return;
-    var formatLyrics;
+    var formatLyrics, isComfirm = true;
 
     for (var k in m) {
       _.conf[k] = m[k];
@@ -250,16 +319,36 @@
     $lrcScrollBox.innerHTML = formatLyrics.lrcTmp;
     $duration.innerText = _.formatDuration(0);
     $currentTime.innerText = _.formatDuration(0);
+    _.resetAnimationFrame();
     _.lrc.cur = 0;
     _.lrc.arr = formatLyrics.lrcArr;
     _.lrc.step = $lrcScrollBox.childNodes[0].getBoundingClientRect().height;
     _.lrc.centerPos = ($lrcBox.getBoundingClientRect().height - _.lrc.step) / 2;
     _.setTransform($lrcScrollBox, _.lrc.centerPos);
+    _.prototype.pause();
     _.timeLine.duration = 0;
     _.timeLine.currentTime = 0;
-    _.prototype.pause();
-    _.audio.src = _.conf.src;
-    _.audio.crossOrigin = 'anonymous';
+    _.timeLine.pausedAt = 0;
+
+    if (!isMobile()) {
+      _.audio.src = _.conf.src;
+      _.audio.crossOrigin = 'anonymous';
+    } else {
+      if(_.done.indexOf(_.conf.name) === -1) {
+        isComfirm = confirm('预加载该音乐资源大约' + _.conf.size + 'M, 继续？（wifi任性，4g慎重）');
+      }
+
+      if (isComfirm) {
+        _.loading = true;
+        $playBtn.className = 'op-btn-i loading';
+        _.loadSource(_.conf.src, function () {
+          _.loading = false;
+          $playBtn.className = 'op-btn-i';
+          _.done.push(_.conf.name);
+        });
+      }
+      console.log(_.timeLine.pausedAt);
+    }
   };
 
 

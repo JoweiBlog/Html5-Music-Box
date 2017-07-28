@@ -5,6 +5,7 @@
   <meta name="author" content="Jowei">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
   <title>Music</title>
+  <!--<script src="http://g.tbcdn.cn/mtb/lib-flexible/0.3.2/??flexible_css.js,flexible.js"></script>-->
   <link rel="stylesheet" href="style/index.css">
   <script src="js/requestAnimationFrame.js"></script>
   <script src="js/source.js"></script>
@@ -62,10 +63,9 @@
     }, false);
 
     document.getElementById('prev_btn').addEventListener('click', function() {
-      if (mi > 1) {
+      if (mi > 0) {
         mi--;
         mb.init(MLS.ml[mi]);
-        mb.play();
       }
     }, false);
 
@@ -73,7 +73,6 @@
       if (mi < MLS.ml.length - 1) {
         mi++;
         mb.init(MLS.ml[mi]);
-        mb.play();
       }
     }, false);
   };
