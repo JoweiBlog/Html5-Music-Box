@@ -182,7 +182,7 @@
       step = Math.round(_.frequencyData.length / meterNum);
       $freCtx.clearRect(0, 0, $frequencyWidth, $frequencyHeight);
       for (var i = 0; i < meterNum; i++) {
-        var v = _.frequencyData[i * step] / 1.5;
+        var v = _.frequencyData[i * step] / 2.5;
         $freCtx.fillRect(i * (meterWidth + gap), $frequency.height - v, meterWidth, v);
       }
     };
