@@ -11,4 +11,4 @@ http://caniuse.com/#search=webAudio
 
 > **下图为已上线实例**
 
-![Image text](https://joweiblog.oss-cn-shanghai.aliyuncs.com/mini/music-demo.png)
+![Image text](https://joweiblog.oss-cn-shanghai.aliyuncs.com/mini/music-demo.png?v=2)
