@@ -1,4 +1,4 @@
-# Html5-Music-Box
+# Music-Box
 主要依赖Web Audio API/Audio/Canvas 实现简单的音乐盒；
 
 ### demo链接 (手机浏览器打开)
